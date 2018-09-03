@@ -63,9 +63,6 @@ with open(providersfile, 'r') as p:
 
 # Cleaning providers' list
 #
-# Ovdje treba dodati još uvjet da se izbaci iz providera ako je starost
-# direktorija veća od recimo 12h kako bi izbjegli korištenje zastarjelog runa
-#
 # Ovaj dio prvenstveno radimo zato jer
 # nam je bitno znati imamo li jedan ili više providera da bi učitali
 # pripadajući tuning config (ispod). To je važno jer ako se radi multi
@@ -86,7 +83,7 @@ providers_list = cleaned_list
 # 1 provider only:
 # ------------------------------------------------------
 if len(providers_list) == 1:
-    print ("Running single provider tuning")
+    print ("Running single provider config tuning")
 
     # Snow probability:
     MTM_TempFac=200         # Larger the number --> Positive t2m has LARGER influence on melting falling snow (default=200)
@@ -110,25 +107,25 @@ if len(providers_list) == 1:
 # Multi provider:
 # ------------------------------------------------------
 if len(providers_list) > 1:
-    print ("Running multi provider tuning")
+    print ("Running multi provider config tuning")
 
     # Snow probability:
     MTM_TempFac=200         # Larger the number --> Positive t2m has LARGER influence on melting falling snow (default=200)
     MTM_TriangleFac=750     # Larger the number --> Positive t2m AND positive zeroChgt have SMALLER influence on melting (default=500)
     # Thunderstorm probability:
     TstmMtdThrsh=33         # Minimum radar reflectivity for updraft method (CAPE/PREC below)
-    TstmRM_Coeff_U=15       # Updraft coefficient (larger number --> larger thunderstorm probability) (radar method)
-    TstmRM_Coeff_R=40       # Radar coefficient (larger number --> smaller thunderstorm probability) (radar method)
-    TstmRM_Coeff_C=15       # CAPE coefficient (larger number --> smaller thunderstorm probability (radar method)
+    TstmRM_Coeff_U=17       # Updraft coefficient (larger number --> larger thunderstorm probability) (radar method)
+    TstmRM_Coeff_R=35       # Radar coefficient (larger number --> smaller thunderstorm probability) (radar method)
+    TstmRM_Coeff_C=10       # CAPE coefficient (larger number --> smaller thunderstorm probability (radar method)
     TstmCM_Coeff_C=5        # CAPE coefficient (larger number --> smaller thunderstorm probability (CAPE method)
     # Thunderstorm flag:
     TstmRED_RadThrsh=48     # Radar threshold for red thunderstorm
-    TstmYEL_RadThrsh=33     # Radar threshold for yellow thunderstorm
+    TstmYEL_RadThrsh=32     # Radar threshold for yellow thunderstorm
     TstmRED_UpThrsh=25      # Updraft percentage threshold for red thunderstorm
     TstmYEL_UpThrsh=3       # Updraft percentage threshold for yellow thunderstorm
     TstmRED_Probab=45       # Minimum probability threshold for red thunderstorm
     TstmYEL_Probab=18       # Minimum probability threshold for yellow thunderstorm
-    TstmYEL_Probab_woRU=45  # Trigger tstm flag even if no radar or updraft condition is met if tstm probability is over this value
+    TstmYEL_Probab_woRU=44  # Trigger tstm flag even if no radar or updraft condition is met if tstm probability is over this value
 
 
 # ------------------- config end ----------------------#
@@ -170,14 +167,13 @@ for loc in locations_list:
                 ["extract","gust","gust",0], \
                 ["extract","h0","h0",0], \
                 ["extract","h2m","h2m",0], \
-                ["extract","mdlhgt","mdlhgt",0], \
                 ["extract","mlcape","mlcape",0], \
                 ["extract","mslp","mslp",0], \
                 ["extract","prec","prec",0], \
                 ["extract","t2m","t2m",0], \
                 ["extract","t850","t850",0], \
-                ["extract","wd","wd",0], \
-                ["extract","wspd","wspd",0]]
+                ["extract","u10","u10",0], \
+                ["extract","v10","v10",0]]
         #sources = [["cldave","cld",0]]
 
         for prov in range(len(providers_list)):
@@ -224,6 +220,8 @@ for loc in locations_list:
         rf['altheight']=altheight
 
         #add cloumn weather
+        rf['wspd'] = np.nan
+        rf['wd'] = np.nan
         rf['weather'] = np.nan
         rf['precpctfinal'] = np.nan
         rf['snowpct'] = np.nan
@@ -255,6 +253,11 @@ for loc in locations_list:
         start_time = time.time()
         if verbose: pprint(rf)
 #        sys.exit()
+
+        # A) Calculate wind speed and direction from U and V vectors
+        rf.loc[(rf['wspd'].isnull()), 'wspd'] = (rf['u10'] ** 2 + rf['v10'] ** 2) ** (0.5)
+        rf.loc[(rf['wd'].isnull()), 'wd'] = 57.3*np.arctan2(rf['u10'],rf['v10'])+180
+
         # B) Calculate final precipitation probability
         rf.loc[(rf['precpctfinal'].isnull()), 'precpctfinal'] = np.clip((rf['precpct'] + (np.clip((rf['rdrmax'] - 20),0,None)/2) + np.clip((rf['cldave'] - 60),0,None)/4),0,100).apply(lambda x: round(x,0))
 
